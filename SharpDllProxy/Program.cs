@@ -76,8 +76,8 @@ DWORD WINAPI DoMagic(LPVOID lpParameter)
             var tempName = Path.GetFileNameWithoutExtension(Path.GetTempFileName());
 
             var orgDllPath = @"";
-
-            var payloadPath = @"shellcode.bin";
+            var payloadDllPath = @"";
+            var payloadFuncName = @"";
 
             var pragmaBuilder = "";
 
@@ -89,27 +89,40 @@ DWORD WINAPI DoMagic(LPVOID lpParameter)
                         orgDllPath = Path.GetFullPath(args[i + 1]);
                 }
 
-
-                if (args[i].ToLower().Equals("--payload") || args[i].ToLower().Equals("-payload"))
+                if (args[i].ToLower().Equals("--payloaddll") || args[i].ToLower().Equals("-payloaddll"))
                 {
-                    if (i + 1 < args.Length) {
-                        //Needed to filter filename input from powershell
-                        payloadPath = Path.GetFileName(args[i + 1]);
+                    if (i + 1 < args.Length)
+                    {
+                        payloadDllPath = Path.GetFullPath(args[i + 1]);
+                    }
+                }
+
+                if (args[i].ToLower().Equals("--payloadfunc") || args[i].ToLower().Equals("-payloadfunc"))
+                {
+                    if (i + 1 < args.Length)
+                    {
+                        payloadFuncName = args[i + 1];
                     }
                 }
             }
 
-            if (string.IsNullOrWhiteSpace(orgDllPath) || !File.Exists(orgDllPath)) {
-                Console.WriteLine($"[!] Cannot locate DLL path, does it exists?");
-                Environment.Exit(0);
-            }
-
-            if (string.IsNullOrWhiteSpace(payloadPath))
+            if (string.IsNullOrWhiteSpace(orgDllPath) || !File.Exists(orgDllPath))
             {
-                Console.WriteLine($"[!] shellcode filname/path is empty, bad input!");
+                Console.WriteLine($"[!] Cannot locate DLL path, does it exist?");
                 Environment.Exit(0);
             }
 
+            if (string.IsNullOrWhiteSpace(payloadDllPath) || !File.Exists(payloadDllPath))
+            {
+                Console.WriteLine($"[!] Cannot locate payload DLL path, does it exist?");
+                Environment.Exit(0);
+            }
+
+            if (string.IsNullOrWhiteSpace(payloadFuncName))
+            {
+                Console.WriteLine($"[!] Payload function name is empty, bad input!");
+                Environment.Exit(0);
+            }
 
             //Create an output directory to export stuff too
             string outPath = Directory.CreateDirectory("output_" + Path.GetFileNameWithoutExtension(orgDllPath)).FullName;
@@ -119,24 +132,22 @@ DWORD WINAPI DoMagic(LPVOID lpParameter)
             //Read PeHeaders -> Exported Functions from provided DLL
             PeNet.PeFile dllPeHeaders = new PeNet.PeFile(orgDllPath);
 
-           //Build up our linker redirects
+            //Build up our linker redirects
             foreach (var exportedFunc in dllPeHeaders.ExportedFunctions)
             {
                 pragmaBuilder += $"#pragma comment(linker, \"/export:{exportedFunc.Name}={tempName}.{exportedFunc.Name},@{exportedFunc.Ordinal}\")\n";
-
             }
-            Console.WriteLine($"[+] Redirected {dllPeHeaders.ExportedFunctions.Count()} function calls from { Path.GetFileName(orgDllPath)} to {tempName}.dll");
+            Console.WriteLine($"[+] Redirected {dllPeHeaders.ExportedFunctions.Count()} function calls from {Path.GetFileName(orgDllPath)} to {tempName}.dll");
 
             //Replace data in our template
             dllTemplate = dllTemplate.Replace("PRAGMA_COMMENTS", pragmaBuilder);
-            dllTemplate = dllTemplate.Replace("PAYLOAD_PATH", payloadPath);
+            dllTemplate = dllTemplate.Replace("PAYLOAD_DLL_PATH", payloadDllPath);
+            dllTemplate = dllTemplate.Replace("PAYLOAD_FUNC_NAME", payloadFuncName);
 
             Console.WriteLine($"[+] Exporting DLL C source to {outPath + @"\" + Path.GetFileNameWithoutExtension(orgDllPath)}_pragma.c");
 
             File.WriteAllText($@"{outPath + @"\" + Path.GetFileNameWithoutExtension(orgDllPath)}_pragma.c", dllTemplate);
             File.WriteAllBytes(outPath + @"\" + tempName + ".dll", File.ReadAllBytes(orgDllPath));
-
-
         }
     }
 }
