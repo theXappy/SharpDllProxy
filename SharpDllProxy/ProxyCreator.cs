@@ -11,7 +11,6 @@ namespace SharpDllProxy
 {
     public class ProxyCreator
     {
-
         public static string dllTemplate = @"
 #include ""pch.h""
 #include <stdio.h>
@@ -72,7 +71,7 @@ BOOL APIENTRY DllMain(HMODULE hModule,
             _logger = logger ?? (Action<string>)((string s)=>{});
         }
 
-        public void CreateProxy(string orgDllPath, string payloadDllPath, string payloadFuncName)
+        public ProxyCreatorResults CreateProxy(string orgDllPath, string payloadDllPath, string payloadFuncName)
         {
             var pragmaBuilder = "";
             if (string.IsNullOrWhiteSpace(orgDllPath) || !File.Exists(orgDllPath))
@@ -108,12 +107,12 @@ BOOL APIENTRY DllMain(HMODULE hModule,
             if (!File.Exists(pchPath))
             {
                 _logger($"[!] pch.h not found in the current directory.");
-                return;
+                return null;
             }
             if (!File.Exists(frameworkPath))
             {
                 _logger($"[!] framework.h not found in the current directory.");
-                return;
+                return null;
             }
 
             //Create an output directory to export stuff too
@@ -156,6 +155,12 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 
             // Compile
             Compile(sourceCodeFile, outputDll);
+
+            return new ProxyCreatorResults
+            {
+                OutputDll = outputDll,
+                ProxiedDll = proxiedDllPath
+            };
         }
 
         private void Compile(string sourceFile, string outputDllFile)
