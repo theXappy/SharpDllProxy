@@ -21,7 +21,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.VisualStudio.Setup.Configuration.Interop" Version="3.13.2069" />
-    <PackageReference Include="PeNet" Version="2.4.0" />
+    <PackageReference Include="PeNet" Version="4.0.1" />
   </ItemGroup>
 
 </Project>
