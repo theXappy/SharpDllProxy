@@ -1,6 +1,4 @@
-﻿using Microsoft.VisualStudio.Setup.Configuration;
-using System;
-using System.Collections.Generic;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -218,28 +216,42 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 
         static string GetVisualStudioPath()
         {
+            string vswherePath = @"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe";
+
+            if (!File.Exists(vswherePath))
+            {
+                throw new FileNotFoundException("[x] vswhere.exe not found at the specified path.");
+            }
+
             try
             {
-                var query = new SetupConfiguration();
-                var instanceEnumerator = query.EnumInstances();
-                int fetched;
-                var instances = new ISetupInstance[1];
-
-                while (true)
+                ProcessStartInfo psi = new ProcessStartInfo
                 {
-                    instanceEnumerator.Next(1, instances, out fetched);
-                    if (fetched == 0)
-                        break;
+                    FileName = vswherePath,
+                    Arguments = "-latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
 
-                    var instance = instances[0];
-                    //_logger($"Instance ID: {instance.GetInstanceId()}");
-                    return instance.GetInstallationPath();
+                using (Process process = new Process { StartInfo = psi })
+                {
+                    process.Start();
+                    string output = process.StandardOutput.ReadToEnd();
+                    process.WaitForExit();
+
+                    if (process.ExitCode != 0 || string.IsNullOrWhiteSpace(output))
+                    {
+                        throw new Exception("[x] Failed to retrieve Visual Studio installation path using vswhere.exe.");
+                    }
+
+                    return output.Trim();
                 }
-                return null;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                throw null;
+                throw new Exception($"[x] An error occurred while running vswhere.exe: {ex.Message}");
             }
         }
     }
